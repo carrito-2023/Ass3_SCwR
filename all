@@ -42,7 +42,7 @@ test <- t.test(x = blm_C, y = blm_G, alternative = "less", var.equal = F)
 test$p.value
 ```
 
-Setting $\alpha = 0.05$, I do not reject the null hypothesis of mu_C ≥ mu_G
+Setting $\alpha = 0.05$, I do not reject the null hypothesis of $\mu_C \geq \mu_G$
 
 # Exercise 2
 
@@ -86,7 +86,7 @@ lines(density(bm_C), col = "magenta4")
 lines(density(bm_G), col = "cyan3")
 ```
 
-I made 2 plots because I wasn't sure which I should make.
+I made 2 plots because I wasn't sure which one I should make.
 
 ## 3
 
@@ -129,25 +129,27 @@ neg.logl = function(theta, pi1, pi2, pi3, w1, w2, w3, x) {
 I have chosen my starting points so that expected value of first iteration probability memberships for jth component is equal to jth pi. I put $\mu$ values to be equal to the means of body mass values for 3 species. I set $\sigma$ values to correspond to standard deviations of body mass values.
 
 ```{r}
-EM_function <- function(x, n.iter = 500){
+EM_function <- function(x, pi_start,n.iter = 500){
 
   n = length(x)
-
-
+  
   pi1hat = rep(NA, n.iter)
   pi2hat = rep(NA, n.iter)
   pi3hat = rep(NA, n.iter)
+  
   p1hat = matrix(NA, n.iter, n)
   p2hat = matrix(NA, n.iter, n)
   p3hat = matrix(NA, n.iter, n)
+  
   theta_hat = matrix(NA, n.iter, 6)
-  pi1hat[1] = 0.2
-  pi2hat[1] = 0.3
-  pi3hat[1] = 0.5
+  
+  pi1hat[1] = pi_start[1]
+  pi2hat[1] = pi_start[2]
+  pi3hat[1] = 1 - pi1hat[1] - pi2hat[1]
 
-  p1hat[1, ] <- runif(n, pi1hat[1] - 0.2, pi1hat[1] + 0.8)
-  p2hat[1, ] <- runif(n, pi2hat[1] - 0.3, pi2hat[1] + 0.7)
-  p3hat[1, ] <- runif(n, pi3hat[1] - 0.5, pi3hat[1] + 0.5)
+  p1hat[1, ] <- runif(n, pi1hat[1] - 0.8*pi_start[1], pi1hat[1] + 0.8*pi_start[1])
+  p2hat[1, ] <- runif(n, pi2hat[1] - 0.8*pi_start[2], pi2hat[1] + 0.8*pi_start[2])
+  p3hat[1, ] <- runif(n, pi2hat[1] - 0.8*pi3hat[1], pi2hat[1] + 0.8*pi3hat[1]) 
 
   theta_hat[1, ] = optim(c(m_bm_kg_A,m_bm_kg_C,m_bm_kg_G,sd_bm_kg_A,sd_bm_kg_C,sd_bm_kg_G),
                          function(theta) neg.logl(theta, pi1hat[1], pi2hat[1], pi3hat[1],
@@ -170,9 +172,12 @@ EM_function <- function(x, n.iter = 500){
     pi2hat[t] = mean(p2hat[t,])
     pi3hat[t] = mean(p3hat[t,])
   
-    theta_hat[t,]= optim(theta_hat[t-1,], function(theta)
-      neg.logl(theta, pi1hat[t], pi2hat[t], pi3hat[t], p1hat[t,], p2hat[t,], p3hat[t,], x))$par
-  }
+    # print(c(t, theta_hat[t-1,],pi1hat[t],pi2hat[t],pi3hat[t],p1hat[t,], p2hat[t,], p3hat[t,]))
+    
+    theta_hat[t,]= optim(theta_hat[t-1,], function(theta) {
+      neg.logl(theta, pi1hat[t], pi2hat[t], pi3hat[t], p1hat[t,], p2hat[t,], p3hat[t,], x)})$par
+    
+   }
   
   logl.last = -neg.logl(theta_hat[n.iter, ], pi1hat[n.iter], pi2hat[n.iter], pi3hat[n.iter],
                            p1hat[n.iter, ], p2hat[n.iter, ], p3hat[n.iter, ], x)
@@ -201,9 +206,9 @@ EM_function <- function(x, n.iter = 500){
 ```{r}
 set.seed(4025814)
 x <- df_3$body_mass_kg
-run_1 <- EM_function(x, n.iter = 500)
-run_2 <- EM_function(x, n.iter = 500)
-run_3 <- EM_function(x, n.iter = 500)
+run_1 <- EM_function(x, c(0.2,0.3), n.iter = 500)
+run_2 <- EM_function(x, c(0.4,0.5), n.iter = 500)
+run_3 <- EM_function(x, c(0.1,0.4), n.iter = 500)
 ```
 
 ## 5
@@ -219,12 +224,13 @@ That solution is going to be the most "likely" to be true.
 
 ```{r}
 EM_estimates = run_2
-EM_estimates$logl; EM_estimates$theta_hat; EM_estimates$pi
+c("logl" = EM_estimates$logl, "theta_hat" = EM_estimates$theta_hat, "pi" = EM_estimates$pi)
 ```
 
 ## 6
 
 ```{r}
+n.iter <- 500
 plot(1:n.iter, run_2$pi_vals_for_conv_check[,1], pch = 22, ylim = c(0.1, 0.4),cex = .6,
      xlab = "iteration number", ylab = "pi1 value", main = "Convergence check")
 plot(1:n.iter, run_2$pi_vals_for_conv_check[,2], pch = 22, ylim = c(0.1, 0.5),cex = .6,
@@ -256,9 +262,12 @@ W3 <- round(run_2$p3_last,3)
 
 ```{r}
 hist(x, 20, prob = T, col = 'steelblue2', ylim = c(0, 1))
-curve(dnorm(x, run_2$theta_hat[1], run_2$theta_hat[4]), add = T, col = 'red', lwd = 2)
-curve(dnorm(x, run_2$theta_hat[2], run_2$theta_hat[5]), add = T, col = 'green2', lwd = 2)
-curve(dnorm(x, run_2$theta_hat[3], run_2$theta_hat[6]), add = T, col = 'pink', lwd = 2)
+hist(rnorm(10000, run_2$theta_hat[1], run_2$theta_hat[4]),
+     col = 'red', lwd = 2, xlab = "W1 distribution", main = "")
+hist(rnorm(10000, run_2$theta_hat[2], run_2$theta_hat[5]),
+     col = 'green2', lwd = 2, xlab = "W2 distribution", main = "")
+hist(rnorm(10000, run_2$theta_hat[3], run_2$theta_hat[6]),
+     col = 'pink', lwd = 2, xlab = "W3 distribution", main = "")
 ```
 
 ## 9
@@ -279,3 +288,17 @@ for (i in 1:342) {
 
 ## 10
 
+```{r}
+table(predictedComponent, df_3$sex)
+table(predictedComponent, df_3$species)
+```
+
+## 11
+
+For `predictedComponent = 1`, I would guess male, according to my frequency distribution.
+For `predictedComponent = 2`, female is my guess.
+For `predictedComponent = 3`, male is my guess.
+
+## 12
+
+For species we have a guess `Gentoo` for `predictedComponent = 1`, `Adelie` for `predictedComponent = 2` and `Adelie` for `predictedComponent = 3`
